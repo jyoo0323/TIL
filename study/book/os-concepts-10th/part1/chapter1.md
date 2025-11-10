@@ -24,3 +24,22 @@ Figure 1.3 (8 pg) 의 해석:
 7. **다음 I/O 요청 반복** 프로그램이 다시 새로운 I/O 작업을 요청하면, 위의 순서가 다시 반복
 
 - 즉 이미 CPU 는 비동기-nonblocking 하게 다른 작업을 프로세싱하고 있고, I/O 장비가 데이터를 전송하는 동안은 다른 작업을 수행하다가, interrupt 가 signaled 될 경우에 다시 기존 작업으로 돌아와 I/O 장비의 완료된 작업을 마무리하는 방식. (어떻게 마무리하는 가는 나중에 볼 수 있을 듯 하다.)
+
+### 1.2.2 Storage Structure
+- 폰 노이만 (von Neumann) 아키텍처:
+  - 명령어 집합에 있는 프로그램을 메모리에 로딩하면 메모리에 있는 명령어들을 CPU가 하나씩 fetch 하고 그 다음에 execute 하는 사이클.
+  - instruction register이라는 메모리 저장장치에 소프트웨어를 탑재해 해당 명령어들을 하나씩 CPU가 패치(fetch)하게 한 후 실행(execute)하는 Fetch-Execute cycle 구조를 가진 stored program computer architecture.
+  - Instruction Set Architecture 라고도 불림
+- Main 메모리(램)는 휘발성 메모리이기 때문에 비휘발성 저장장치가 필요하고, 이러한 저장 장치들은 엑세스 타임에 따라 용량과 접근속도에 따라 여러 계증구조로 나뉘고, 저장되는 데이터의 성격 (얼마나 빨리 CPU가 엑세스 해야하는지)에 따라 나위어 저장된다.
+
+| 계층 (상위 → 하위)               | 저장장치 예시             | 휘발성 여부              | 저장 용량 | 접근 속도 | 분류                    |
+| -------------------------- | ------------------- | ------------------- | ----- | ----- | --------------------- |
+| **Registers**              | CPU 내부 레지스터         | 휘발성 (Volatile)      | 매우 작음 | 매우 빠름 | **Primary Storage**   |
+| **Cache**                  | CPU 캐시 (L1, L2, L3) | 휘발성                 | 작음    | 매우 빠름 | **Primary Storage**   |
+| **Main Memory**            | RAM (DRAM, SDRAM)   | 휘발성                 | 중간    | 빠름    | **Primary Storage**   |
+| **Nonvolatile Memory**     | SSD, Flash Memory   | 비휘발성 (Non-volatile) | 중간~큼  | 보통    | **Secondary Storage** |
+| **Hard-Disk Drives (HDD)** | 하드 디스크              | 비휘발성                | 큼     | 느림    | **Secondary Storage** |
+| **Optical Disk**           | CD, DVD, Blu-ray    | 비휘발성                | 큼     | 느림    | **Tertiary Storage**  |
+| **Magnetic Tapes**         | 백업용 자기테이프           | 비휘발성                | 매우 큼  | 매우 느림 | **Tertiary Storage**  |
+
+
