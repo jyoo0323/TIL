@@ -43,3 +43,18 @@ Figure 1.3 (8 pg) 의 해석:
 | **Magnetic Tapes**         | 백업용 자기테이프           | 비휘발성                | 매우 큼  | 매우 느림 | **Tertiary Storage**  |
 
 
+### 1.2.3 I/O Structure
+- I/O 가 일어날 때, CPU의 레지스터에 저장된 내용들을 (메모리 버퍼 주소, 데이터 크기, I/O 버퍼 주소 등)을 CPU가 세팅하고 이 정보들로 DMA 장비에 요청을 보내 장비에서 메인 메모리로 직접 데이터를 쓸 수 있게 DMA 장비의 컨트롤러에 요청을 보냄. 이 작업이 완료되면 interrupt를 발생시켜 I/O 작업이 끝났음을 CPU에 알리고 후속 작업을 진행
+
+### 1.3.2 multiprocessor systems
+terminologies:
+1. CPU - 인스트럭션을 실행하는 하드웨어
+2. Processor - 하나 이상의 CPU를 가지고 있는 물리 칩
+3. Core - CPU의 단위
+4. Multicore - 같은 종류의 CPU를 여러개 가진 코어
+5. Mutliprocessor - 프로세서가 여러개인
+
+- symmetric multiprocessing architecture: 두개의 프로세서가 각각 CPU를 가지고 하나의 메인 메모리를 공유하는 방식
+  - 이 방식은 CPU n 개 -> n 배의 효율을 내지는 못한다
+  - 이 문제를 개선할 수 있는 방법이 NUMA
+- NUMA (non-uniform memory access): 모든 CPU가 shared system interconnect를 통해 하나의 물리 주소 공간을 가지게되어, 로컬 메모리에 접근시 더 빨라지고, 각 CPU의 메모리에 빨리 접근이 가능해저 효율적임
