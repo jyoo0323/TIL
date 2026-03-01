@@ -1,0 +1,147 @@
+# Ch.04 Encoding and Evolution
+
+----
+- idea  of evolvability: 변경을 적용(adapt)하기 쉬운 시스템을 만들어야 한다
+  - 주로 변경이 발생하면 저장하는 데이터도 변경된다.
+- backward compatibility:
+  - 신규코드가 이전 데이터로도 동작
+  - 대부분의 경우 지원을 함
+- forward compatibility:
+  - 구버전 코드가 신규 데이터로도 동작
+  - 이게 필요한 경우는 언제일까?
+    - 롤링 배포/부분 배포로 ‘새 writer + 구 reader’ 혼재가 발생할 때 
+      - 새 버전 인스턴스가 DB/메시지큐/캐시에 새 형태로 쓰기 시작했는데, 아직 구버전 인스턴스(컨수머)가 그 데이터를 읽어야 하는 기간이 생김.
+
+### Formats for Encoding Data
+1. 인메모리 데이터:
+   - 객체, 구조, 리스트, 해시테이블, 트리 등등등
+   - CPU의 효율적인 접근과 조작을 위해 (주로 포인터를 이용해) 최적화 되어있음
+2. 저장/전송을 위한 데이터:
+   - 스스로를 포함한 일련의 바이트열 (self-contained sequence of bytes)
+   - 인메모리 구조를 변환해서 만든 직렬화된 바이트
+     - 바이트만 가지고 받는 쪽에서 어떻게 다시 직렬화가 가능한걸까? 데이터에는 어떻게 연결이 되어있는지 등 자료구조에 대한 정보도 필요할텐데 이게 어떻게 저장되어 있을까?
+       - JSON 같은 경우는 문자열로 저장이 되기에 바이트 배열에 사용되는 인코딩 (주로 UTF-8) 을 통해 순서대로 변환되고, 읽는 시점에 JSON 구조에 필요한 delimiter들(`{`,`"`,`:`, `,`, `}`)을 통해 클라이언트 쪽의 JSON 파서에서 읽어들임
+- 위 두 케이스에 맞게 전환이 필요함:
+  - 부호화 (Encoding, serialization, marshaling): 인메모리 -> 바이트열로의 전환
+  - 복호화 (Decoding, parsing, deserialization, unmarshaling): 바이트열 -> 인메모리 데이터 형태로의 전환
+
+- Language Specific Encoding Data:
+  - 장점:
+    - 객체를 거의 그대로 저장/복원할 수 있어 매우 편리함
+  - 단점:
+    - 언어에 묶여 다른 언어에서 읽기가 어려움
+    - 복호화시 보안문제: 복호화를 한다는 건 어떠한 클래스들로 인스턴스화해야 함 -> 공격자가 임의 코드를 실행 시킬 여지가 있음
+      - ???자바에서는 어떻게 방지하는가?
+    - 효율성 문제
+      - ???자바의 내장 직렬화는 성능이 좋지 않다는데 왜 자바는 이렇게 많이 쓰일까? 내장된 부호화를 사용하는것이 효율이 좋지 않으면, 어떻게 부호화를 해서 응답을 하는게 좋은걸까? 
+
+- JSON, XML, and Binary Variants
+  - 텍스트 기반
+  - 언어독립적 -> 널리 쓰이고 지원 범위 넓음
+  - lowest common denominator 로서 가치가 큼
+  - 미묘한 문제: 
+    - 숫자 표현의 한계: json 의 floating point precision
+    - binary string 표현이 약함 -> base64 로 work arount
+- Binary Encoding
+  - 대용량 데이터의 용량/파싱 비용이 있기에 고안됨
+  - message pack, BSON, Smile 등 json/xml의 모델을 유지한 채 더 compact한 표현 시도
+
+- Thrift And Protocol buffers
+  - schema 와 field tag 을 이용해 field name 을 더 이상 인코딩할 필요가 없어짐
+  - required / optional: 인코딩시 데이터에 포함되는게 아니라 스키마에만 포함됨
+    - runtime validation에 사용
+  - Schema evolution 규칙:
+    - 필드이름 변경 -> 가능 (인코딩된 데이터에는 필드 태그만 있고 이 태그로 필드를 매핑)
+    - 필드 추가 -> 기존 필드 태그 넘버와 겹치지만 않으면 됨.
+      - old code 에서 읽을 때 없는 태그를 무시하면 forward compatability 를 챙길 수 있다
+    - 필드 제거 -> optional 필드는 제거 가능
+      - 제거한 필드 태크 넘버 재사용 불가
+    - 필드 타입 변경 -> 가능은 함 (truncation / precision loss) 문제가 있음
+- Avro
+  - schema 는 있지만 필드 태그 넘버가 없음
+  - writer’s schema: 데이터를 쓴 쪽이 알고 있는 스키마 
+  - reader’s schema: 데이터를 읽는 쪽이 기대하는 스키마
+  - schema를 조회하는 방법:
+    - 큰 파일: 파일 헤더에 schema 1번 저장(object container file)
+    - DB 레코드: 레코드 앞에 schema version 저장 후 schema registry/DB 에서 조회 
+    - 네트워크: connection setup 시 schema negotiation
+- The Merits of Schemas 
+  - field name 을 생략할 수 있어 매우 compact 함 
+  - schema 자체가 강력한 문서 역할을 함 
+    - schema registry/버전 관리가 있으면 변경 전 compatibility 검사가 가능함 
+### Modes of Dataflow
+
+- Dataflow through database
+  - DB 에 write 하는 프로세스: encode 
+  - DB 에 read 하는 프로세스: decode
+  - backward compatibility 가 지켜져야함
+    - rolling upgrade 지원시 forward compatability
+  -  archival storage
+    - snapshot/backup/data warehouse dump 같은 경우는 한 번에 다시 인코딩 기회가 있음 -> 최신 schema + analytics-friendly format(Avro object container, Parquet) 으로 변경가능
+- Dataflow Through Services: REST and RPC
+  - DB와의 차이:
+    - 서비스는 business logic 이 정한 특정 API 만 노출
+      - 더 강한 캡슐화 제공
+    - compatability 관점:
+      - (micro services 환경에서) 독립배포를 위해 old/new version이 공존할 때에도 API호환성이 유지되어야 함
+  - Web Services:
+    - REST
+      - HTTP위의 설계 철학
+      - 단순한 데이터 포맷, URL/resources, HTTP 기능 적극 활용
+    - SOAP
+      - XML 기반 프로토콜 (HTTP를 기반에 가지고 있긴함)
+        - http의 기능들의 사용을 피함
+      - WSDL (Web Services Description Language) 라는 XML 기반 언어를 사용
+        - 사람이 읽을 수 없는 형태
+      - 복잡성 때문에 비선호되고 있음
+- RPCs
+  - to make a request to a remote network service look the same as calling a function or method in your programming language
+  - The problems with remote procedure calls (RPCs)
+    - RPC의 아이디어: 원격 호출을 로컬 메서드 호출처럼 보이게 하자(location transparency)
+      - 그러나 네트워크 호출은 로컬 함수 호출과 본질적으로 다름
+        - 네트워크는 패킷 손실/지연/원격 노드 장애가 있음
+          - 네트워크 latency 는 훨씬 크고 변동성도 심함
+        - timeout 이 발생하면 “실패했는지, 성공했는데 응답만 잃은 건지” 알 수 없음
+        - retry 시 중복 수행 가능성이 있어 idempotency 가 중요해짐
+  - Current directions for RPC
+    - 최근 보이는 RPC 프레임워크들의 특징:
+      - The problems with remote procedure calls (RPCs)
+      - future/promise 로 비동기 실패 가능성 모델링
+      - stream 요청/응답 지원 (ex: gRPC)
+      - service discovery 제공
+    - RPC의 장점: custom binary protocol 사용 시 JSON over REST 보다 성능이 좋을 수 있음
+    - REST의 장점: 
+      - 실험을 하거나 디버깅이 편함 
+        - curl, 브라우저로 빠르게 확인 가능
+      - 수많은 언어 플랫폼에서 지원해줌 & 훌륭한 생태계
+      - 위 장점들로 사실상 표준 취급
+  - Data encoding and evolution for RPC
+    - RPC 도 결국 client 와 server 가 서로 다른 버전일 수 있음
+    - only need backward compatibility on requests, and forward compatibility on responses.
+      - server 의 새 버전이 old client 를 깨지 않아야 함 
+      - client 의 새 버전이 old server 와도 동작해야 함
+    - schema evolution 문제를 피할 수 없음
+- Message-Passing Dataflow
+  - asynchronous message-passing systems, which are somewhere between RPC and databases
+    - RPC와의 유사성: client’s request (message) 가 ow latency로 다른 프로세스로 전송됨
+    - DB 와의 유사성: message 네트워크 커넥션을 통해 바로 날아가지만, 중간에 브로커에 일시적으로 저장됨
+  - Using a message broker has several advantages compared to direct RPC
+    - 수신자가 잠시 죽어 있어도 버퍼 역할 가능
+    - 재전달로 메시지 유실 완화 가능
+    - sender 가 receiver 의 IP/port 를 몰라도 됨
+    - fan-out 가능 (한 메시지를 여러 수신자에게 전달)
+    - sender / receiver 를 논리적으로 decouple 가능
+  - 그러나 message passing 은 주로 단방향 통신이고 RPC는 양방향
+  - Message Brokers
+    - 데이터 모델이 강제되지 않음 (그냥 바이트 배열과 메타이터만 있음 됨!) -> encoding 포맷을 정하기만 하면 된다!
+      - 다만 수신/송싱 측에 전부 compatability가 수신/송신 측에서 전부 맞아야함
+  - Distributed actor frameworks
+    - act model
+      - 각 actor 는 자신의 local state 를 갖고, async message 로만 통신
+      - shared mutable state 를 줄여 thread/lock 문제를 완화
+      - 같은 노드든 다른 노드든 동일한 message passing 모델을 사용
+      - 원격이면 내부적으로 encode -> network transfer -> decode 수행
+      - actor model 은 애초에 메시지 손실/비동기성의 가능성을 전제 -> RPC와는 다른 부분이고, 이 때문에 location transparency 가 해결됨
+    - 한계:
+      - rolling upgrade 중 메시지 호환성 문제는 똑같이 존재
+        - schema evolution 을 신경써야 함
